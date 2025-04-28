@@ -1,3 +1,7 @@
+/* eslint-disable prefer-const */
+/* eslint-disable one-var */
+/* eslint-disable prefer-template */
+/* eslint-disable prettier/prettier */
 import {
   App,
   ButtonComponent,
@@ -224,6 +228,21 @@ export interface ExcalidrawSettings {
   modifierKeyOverrides: {modifiers: Modifier[], key: string}[];
   showSplashscreen: boolean;
   pdfSettings: PDFExportSettings;
+
+  // Custom File Naming Settings
+  enableCustomFileNamePattern: boolean;
+  customFileNamePattern: string;
+  fileNamePlaceholders: {
+    noteName: string;
+    dateTime: string;
+    imageName: string;
+    customKey: string;
+  };
+  allowedPlaceholders: string[];
+  safeFileNameCharacters: string;
+  maxFileNameLength: number;
+  fallbackFileNamePattern: string;
+  hasMigratedToCustomNaming: boolean;
 }
 
 declare const PLUGIN_VERSION:string;
@@ -516,6 +535,21 @@ export const DEFAULT_SETTINGS: ExcalidrawSettings = {
     alignment: "center",
     margin: "normal",
   },
+
+  // Custom File Naming Defaults
+  enableCustomFileNamePattern: false,
+  customFileNamePattern: "{NOTE_NAME}_{DATE:YYYY-MM-DD HH.mm.ss}",
+  fileNamePlaceholders: {
+    noteName: "{NOTE_NAME}",
+    dateTime: "{DATE:YYYY-MM-DD HH.mm.ss}",
+    imageName: "{IMAGE_NAME}",
+    customKey: "{KEY:value}"
+  },
+  allowedPlaceholders: ["NOTE_NAME", "DATE", "IMAGE_NAME", "KEY"],
+  safeFileNameCharacters: "a-zA-Z0-9-_.",
+  maxFileNameLength: 255,
+  fallbackFileNamePattern: "Drawing {DATE:YYYY-MM-DD HH.mm.ss}",
+  hasMigratedToCustomNaming: false,
 };
 
 export class ExcalidrawSettingTab extends PluginSettingTab {
@@ -871,6 +905,7 @@ export class ExcalidrawSettingTab extends PluginSettingTab {
     const filenameEl = detailsEl.createEl("p", { text: "" });
     filenameEl.innerHTML = getFilenameSample();
 
+    // Existing filename settings
     new Setting(detailsEl)
       .setName(t("FILENAME_PREFIX_NAME"))
       .setDesc(fragWithHTML(t("FILENAME_PREFIX_DESC")))
@@ -951,51 +986,130 @@ export class ExcalidrawSettingTab extends PluginSettingTab {
           }),
       );
 
+    // Custom File Naming Settings
     new Setting(detailsEl)
-      .setName(t("CROP_PREFIX_NAME"))
-      .setDesc(fragWithHTML(t("CROP_PREFIX_DESC")))
-      .addText((text) =>
-        text
-          .setPlaceholder("e.g.: Cropped_ ")
-          .setValue(this.plugin.settings.cropPrefix)
+      .setName(t("ENABLE_CUSTOM_NAMING"))
+      .setDesc(t("ENABLE_CUSTOM_NAMING_DESC"))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableCustomFileNamePattern)
           .onChange(async (value) => {
-            this.plugin.settings.cropPrefix = value.replaceAll(
-              /[<>:"/\\|?*]/g,
-              "_",
-            );
-            text.setValue(this.plugin.settings.cropPrefix);
+            this.plugin.settings.enableCustomFileNamePattern = value;
+            await this.plugin.saveSettings();
             this.applySettingsUpdate();
           }),
       );
 
     new Setting(detailsEl)
-      .setName(t("ANNOTATE_PREFIX_NAME"))
-      .setDesc(fragWithHTML(t("ANNOTATE_PREFIX_DESC")))
+      .setName(t("CUSTOM_PATTERN"))
+      .setDesc(t("CUSTOM_PATTERN_DESC"))
       .addText((text) =>
         text
-          .setPlaceholder("e.g.: Annotated_ ")
-          .setValue(this.plugin.settings.annotatePrefix)
+          .setPlaceholder("{NOTE_NAME}_{DATE:YYYY-MM-DD HH.mm.ss}")
+          .setValue(this.plugin.settings.customFileNamePattern)
           .onChange(async (value) => {
-            this.plugin.settings.annotatePrefix = value.replaceAll(
-              /[<>:"/\\|?*]/g,
-              "_",
-            );
-            text.setValue(this.plugin.settings.annotatePrefix);
+            this.plugin.settings.customFileNamePattern = value;
+            await this.plugin.saveSettings();
             this.applySettingsUpdate();
           }),
       );
-    
+
+    // Add placeholder documentation header
+    const placeholderHeader = detailsEl.createEl("div", {
+      cls: "setting-item-description",
+    });
+    placeholderHeader.innerHTML = `
+      <h4>Available Placeholders</h4>
+      <ul>
+        <li><code>{NOTE_NAME}</code> - Name of the attached note</li>
+        <li><code>{DATE:format}</code> - Timestamp with custom format (e.g. YYYY-MM-DD HH.mm.ss)</li>
+        <li><code>{IMAGE_NAME}</code> - Original image name</li>
+        <li><code>{KEY:value}</code> - Custom key-value pairs</li>
+      </ul>
+      <p>Example patterns:</p>
+      <ul>
+        <li><code>{NOTE_NAME}_{DATE:YYYY-MM-DD}_{IMAGE_NAME}</code></li>
+        <li><code>{NOTE_NAME}/images/{DATE:YYYYMMDD_HHmmss}</code></li>
+      </ul>
+    `;
+
+    // Placeholder Settings
     new Setting(detailsEl)
-      .setName(t("ANNOTATE_PRESERVE_SIZE_NAME"))
-      .setDesc(fragWithHTML(t("ANNOTATE_PRESERVE_SIZE_DESC")))
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.annotatePreserveSize)
+      .setName(t("PLACEHOLDER_SETTINGS"))
+      .setDesc(t("PLACEHOLDER_SETTINGS_DESC"));
+
+    new Setting(detailsEl)
+      .setName(t("DATETIME_PLACEHOLDER"))
+      .setDesc(t("DATETIME_PLACEHOLDER_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("{DATE:YYYY-MM-DD HH.mm.ss}")
+          .setValue(this.plugin.settings.fileNamePlaceholders.dateTime)
           .onChange(async (value) => {
-            this.plugin.settings.annotatePreserveSize = value;
+            this.plugin.settings.fileNamePlaceholders.dateTime = value;
+            await this.plugin.saveSettings();
             this.applySettingsUpdate();
           }),
-      );
+    );
+
+    new Setting(detailsEl)
+      .setName(t("IMAGE_NAME_PLACEHOLDER"))
+      .setDesc(t("IMAGE_NAME_PLACEHOLDER_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("{IMAGE_NAME}")
+          .setValue(this.plugin.settings.fileNamePlaceholders.imageName)
+          .onChange(async (value) => {
+            this.plugin.settings.fileNamePlaceholders.imageName = value;
+            await this.plugin.saveSettings();
+            this.applySettingsUpdate();
+          }),
+    );
+
+    new Setting(detailsEl)
+      .setName(t("SAFE_CHARACTERS"))
+      .setDesc(t("SAFE_CHARACTERS_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("a-zA-Z0-9-_.")
+          .setValue(this.plugin.settings.safeFileNameCharacters)
+          .onChange(async (value) => {
+            this.plugin.settings.safeFileNameCharacters = value;
+            await this.plugin.saveSettings();
+            this.applySettingsUpdate();
+          }),
+    );
+
+    new Setting(detailsEl)
+      .setName(t("MAX_FILENAME_LENGTH"))
+      .setDesc(t("MAX_FILENAME_LENGTH_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("255")
+          .setValue(this.plugin.settings.maxFileNameLength.toString())
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num > 0) {
+              this.plugin.settings.maxFileNameLength = num;
+              await this.plugin.saveSettings();
+              this.applySettingsUpdate();
+            }
+          }),
+    );
+
+    new Setting(detailsEl)
+      .setName(t("FALLBACK_PATTERN"))
+      .setDesc(t("FALLBACK_PATTERN_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("Drawing {DATE:YYYY-MM-DD HH.mm.ss}")
+          .setValue(this.plugin.settings.fallbackFileNamePattern)
+          .onChange(async (value) => {
+            this.plugin.settings.fallbackFileNamePattern = value;
+            await this.plugin.saveSettings();
+            this.applySettingsUpdate();
+          }),
+    );
 
     //------------------------------------------------
     // AI Settings
@@ -3215,5 +3329,78 @@ export class ExcalidrawSettingTab extends PluginSettingTab {
           });
         });
     }
+
+    // Add Custom File Naming Settings
+    containerEl.createEl("h2", { text: t("CUSTOM_FILE_NAMING") });
+    
+    const customNamingDetails = containerEl.createEl("details");
+    customNamingDetails.createEl("summary", { text: t("CUSTOM_FILE_NAMING_DETAILS") });
+
+    const customNamingContainer = customNamingDetails.createEl("div", {
+      cls: "setting-item-control",
+    });
+
+    // Enable Custom Naming Toggle
+    new Setting(customNamingContainer)
+      .setName(t("ENABLE_CUSTOM_NAMING"))
+      .setDesc(t("ENABLE_CUSTOM_NAMING_DESC"))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableCustomFileNamePattern)
+          .onChange(async (value) => {
+            this.plugin.settings.enableCustomFileNamePattern = value;
+            await this.plugin.saveSettings();
+            this.applySettingsUpdate();
+          }),
+      );
+
+    // Custom Pattern Input
+    new Setting(customNamingContainer)
+      .setName(t("CUSTOM_PATTERN"))
+      .setDesc(t("CUSTOM_PATTERN_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("{NOTE_NAME}_{DATE:YYYY-MM-DD HH.mm.ss}")
+          .setValue(this.plugin.settings.customFileNamePattern)
+          .onChange(async (value) => {
+            this.plugin.settings.customFileNamePattern = value;
+            await this.plugin.saveSettings();
+            this.applySettingsUpdate();
+          }),
+      );
+
+    // Add placeholder documentation
+    const placeholderDoc = customNamingContainer.createEl("div", {
+      cls: "setting-item-description excalidraw-placeholder-doc",
+    });
+    placeholderDoc.innerHTML = `
+      <h4>Available Placeholders</h4>
+      <ul>
+        <li><code>{NOTE_NAME}</code> - Name of the attached note</li>
+        <li><code>{DATE:format}</code> - Timestamp with custom format (e.g. YYYY-MM-DD HH.mm.ss)</li>
+        <li><code>{IMAGE_NAME}</code> - Original image name</li>
+        <li><code>{imageNameKey}</code> - Custom user-defined property of the file</li>
+      </ul>
+      <p>Example patterns:</p>
+      <ul>
+        <li><code>embed_{DATE:YYYY-MM-DD_HH-mm-ss}_{NOTE_NAME}</code></li>
+        <li><code>{DATE:YYYY-MM-DD_HH-mm-ss}_{imageNameKey}</code></li>
+      </ul>
+    `;
+
+    // Placeholder Settings
+    new Setting(customNamingContainer)
+      .setName(t("PLACEHOLDER_SETTINGS"))
+      .setDesc(t("PLACEHOLDER_SETTINGS_DESC"))
+      .addText((text) =>
+        text
+          .setPlaceholder("{NOTE_NAME}")
+          .setValue(this.plugin.settings.fileNamePlaceholders.noteName)
+          .onChange(async (value) => {
+            this.plugin.settings.fileNamePlaceholders.noteName = value;
+            await this.plugin.saveSettings();
+            this.applySettingsUpdate();
+          }),
+      );
   }
 }

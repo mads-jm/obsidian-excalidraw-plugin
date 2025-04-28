@@ -1112,4 +1112,28 @@ FILENAME_HEAD: "Filename",
 
   //exportUtils.ts
   PDF_EXPORT_DESKTOP_ONLY: "PDF export is only available on desktop",
+
+  // Custom File Naming
+  CUSTOM_FILE_NAMING: "Custom File Naming",
+  CUSTOM_FILE_NAMING_DETAILS: "Custom File Naming Settings",
+  ENABLE_CUSTOM_NAMING: "Enable Custom File Naming",
+  ENABLE_CUSTOM_NAMING_DESC: "Enable custom file naming patterns with placeholders",
+  CUSTOM_PATTERN: "Custom Pattern",
+  CUSTOM_PATTERN_DESC: "Pattern to use for naming files. Use placeholders in curly braces.",
+  PLACEHOLDER_SETTINGS: "Placeholder Settings",
+  PLACEHOLDER_SETTINGS_DESC: "Configure available placeholders and their formats",
+  DATETIME_PLACEHOLDER: "DateTime Placeholder",
+  DATETIME_PLACEHOLDER_DESC: "Format for datetime placeholders",
+  IMAGE_NAME_PLACEHOLDER: "Image Name Placeholder",
+  IMAGE_NAME_PLACEHOLDER_DESC: "Format for image name placeholders",
+  SAFE_CHARACTERS: "Safe Characters",
+  SAFE_CHARACTERS_DESC: "Regular expression pattern for allowed characters",
+  MAX_FILENAME_LENGTH: "Max Filename Length",
+  MAX_FILENAME_LENGTH_DESC: "Maximum allowed length for generated filenames",
+  FALLBACK_PATTERN: "Fallback Pattern",
+  FALLBACK_PATTERN_DESC: "Pattern to use when custom pattern fails",
+
+  // Filename Section
+  FILENAME: "Filename",
+  FILENAME_DETAILS: "Filename Settings",
 };

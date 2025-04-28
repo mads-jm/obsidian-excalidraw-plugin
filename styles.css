@@ -735,3 +735,26 @@ textarea.excalidraw-wysiwyg, .excalidraw input {
 .excalidraw .context-menu {
   height: fit-content;
 }
+
+.excalidraw-placeholder-doc {
+  margin: 1em 0;
+  padding: 1em;
+  background-color: var(--background-secondary);
+  border-radius: 4px;
+}
+
+.excalidraw-placeholder-doc h4 {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+.excalidraw-placeholder-doc ul {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.excalidraw-placeholder-doc code {
+  background-color: var(--background-primary);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
